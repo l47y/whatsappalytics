@@ -16,7 +16,7 @@ But other formats could be easily added as soon as I see them.
 ## Example 
 See make_report for an example. Click on the upper right corner of the notebook to see it rendered in the nbviewer such that you can see every plot. 
 
-## Further Ideas / TODOs
+## Further Ideas 
 - Add user defined stopwords to wordcloud
 - Add a different plot style (the current one looks more beautiful in my local jupyter-notebook where the background is dark grey)
 - Test IOS format of exported chat
