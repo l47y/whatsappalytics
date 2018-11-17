@@ -1,6 +1,9 @@
 # whatsappalytics
 
 
+- - under development - - 
+
+
 ## Summary
 This is a toolkit to analyse whatsapp chats. Used in a notebook it can produce a nice report of one of your chats.
 Not that this is still under development so more functionality will be added and it could still be prone to errors.
