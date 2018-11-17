@@ -127,9 +127,9 @@ class whatsapp_analytics():
             sizes_dict[self.my_name + '_charlen']
         other_stuff['Average message size in characters'] = \
             sizes_dict[self.other_name + '_charlen']
-        my_stuff['Average respond time for all messages (seconds)'] = \
+        my_stuff['Average respond time for all messages (minutes)'] = \
             resptimes_dict[self.my_name]
-        other_stuff['Average respond time for all messages (seconds)'] = \
+        other_stuff['Average respond time for all messages (minutes)'] = \
             resptimes_dict[self.other_name]
         my_stuff['Average respond time for intraday messages (minutes)'] = \
             resptimes_dict[self.my_name + '_intraday']
@@ -150,11 +150,12 @@ class whatsapp_analytics():
         layout = layout_for_plots
         
         if tail:
-            bins =dict(start=30, size=90)
+            xmax = np.max([np.max(my_times), np.max(other_times)])
+            bins =dict(start=30, size=xmax/30)
             layout['title'] = 'Distribution of long time respond time in minutes'
         else:
             xmax = np.max([np.max(my_times), np.max(other_times)])
-            bins = dict(start=0, end=30, size=xmax/30)
+            bins = dict(start=0, end=30, size=1)
             layout['title'] = 'Distribution of short time respond time in minutes'
         my_hist = go.Histogram(x=my_times, xbins=bins, name=self.my_name)
         other_hist =go.Histogram(x=other_times, xbins=bins, name=self.other_name)

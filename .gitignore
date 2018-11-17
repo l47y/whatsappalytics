@@ -1,2 +1,3 @@
 /data/*
-make_report.ipynb/*
+/__pycache__/*
+/.ipynb_checkpoints/*
