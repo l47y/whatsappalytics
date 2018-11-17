@@ -8,10 +8,12 @@ The base files which are used by this toolkit are exported whatsapp chats in .tx
 
 ## Issues
 I don't know which kind of formats of exported whatsapp chats exist, so for now this only works for the following format:
-15.04.18, 20:43 - <Name1>: <text of message...>
-19.04.18, 21:51 - <Name2>: <text of message...>
+15.04.18, 20:43 - Name1: text of message...
+19.04.18, 21:51 - Name2: text of message...
               ......
-But other formats could be easily added as soon as i get confrontated with them. 
+But other formats could be easily added as soon as I see them. 
+Further I still have to figure out which is the exact string used in the .txt file when media is excluded (in the german version: <Medien ausgeschlossen>).
+
   
 ## Example 
 Here you can see an example output of the toolkit used in a jupyter-notebook
