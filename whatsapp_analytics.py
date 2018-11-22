@@ -16,17 +16,39 @@ from stop_words import get_stop_words
 
 class whatsapp_analytics():
     
-    def __init__(self, my_name, other_name, path, languages=['german']):
+    def __init__(self, my_name, other_name, path=None, text=None,
+                 languages=['german']):
         self.my_name = my_name
         self.other_name = other_name
-        self.path = path
-        self.df = self.whatsapp_to_df(self.my_name, self.other_name, self.path)
+        if text != None:
+            self.df = self.whatsapp_to_df(self.my_name, self.other_name,
+                                          whatsapp_text=text)
+        else:  
+            self.path = path
+            self.df = self.whatsapp_to_df(self.my_name, self.other_name, 
+                                          self.path)
         self.my_table = self.df.loc[self.df['Written_by'] == my_name, :]
         self.other_table = self.df.loc[self.df['Written_by'] == other_name, :]
         self.languages = languages
 
         
-    def whatsapp_to_df(self, my_name, other_name, path_of_whatsapp_text,
+    def replace_german_umlaute(text):
+        umlaute_dict = {
+            '\\xc3\\xa4': 'ae',  
+            '\\xc3\\xb6': 'oe',  
+            '\\xc3\\xbc': 'ue', 
+            '\\xc3\\x84': 'Ae',  
+            '\\xc3\\x96': 'Oe', 
+            '\\xc3\\x9c': 'Ue', 
+            '\\xc3\\x9f': 'ss',
+        }
+        for k in umlaute_dict.keys():
+            text = text.replace(k, umlaute_dict[k])
+        return text
+        
+        
+    def whatsapp_to_df(self, my_name, other_name, path_of_whatsapp_text=None,
+                       whatsapp_text=None, 
                        no_media_string = '<Medien ausgeschlossen>'):
         '''
         Takes a whatsapp chat backup and cleanse it and makes a table with
@@ -37,8 +59,12 @@ class whatsapp_analytics():
         other_name -- Name of chat partner like it appears in original file
         path_of_whatsapp_text -- Path where to find the original text file
         '''
-        with open(path_of_whatsapp_text) as file:
-            chat = file.read().split('\n')[:-1]
+        
+        if whatsapp_text != None:
+            chat = whatsapp_text.split('/n')[:-1]
+        else:
+            with open(path_of_whatsapp_text) as file:
+                chat = file.read().split('\n')[:-1]
        
         chat = [message for message in chat if no_media_string not in message]
         where_my_name = [my_name in s for s in chat]
