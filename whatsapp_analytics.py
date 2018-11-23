@@ -10,23 +10,27 @@ import matplotlib.pyplot as plt
 from config import layout_for_plots, strings_to_exclude
 from wordcloud import WordCloud
 from stop_words import get_stop_words
+import warnings
 
 
 
 
 class whatsapp_analytics():
     
-    def __init__(self, my_name, other_name, path=None, languages=['german']):
-        self.my_name = my_name
-        self.other_name = other_name
+    def __init__(self, path, languages=['german']):
         self.path = path
-        self.df = self.whatsapp_to_df(self.my_name, self.other_name, self.path)
-        self.my_table = self.df.loc[self.df['Written_by'] == my_name, :]
-        self.other_table = self.df.loc[self.df['Written_by'] == other_name, :]
+        self.df = self.whatsapp_to_df(self.path)
+        tables = list()
+        names = list()
+        for name in np.unique(self.df['Written_by']):
+            tables.append(self.df.loc[self.df['Written_by'] == name, :])
+            names.append(name)
+        self.tables = tables
+        self.names = names
         self.languages = languages
 
         
-    def whatsapp_to_df(self, my_name, other_name, path_of_whatsapp_text=None,
+    def whatsapp_to_df(self, path_of_whatsapp_text=None,
                        exclude = strings_to_exclude):
         '''
         Takes a whatsapp chat backup and cleanse it and makes a table with
@@ -66,21 +70,23 @@ class whatsapp_analytics():
             return np.unique(found_formats)[0]  
         
         format_ = format_consistency_check(chat[0:10])
+        self.format = format_
 
         for string in exclude:
             chat = [message for message in chat if string not in message]
       
-        where_my_name = [my_name in s for s in chat]
-        where_other_name = [not b for b in where_my_name]
         writtenby = np.empty(len(chat), dtype='U24')
-        writtenby[where_my_name] = my_name
-        writtenby[where_other_name] = other_name
-        
+        regex = '(?<=' + formats[format_] + ')(.*?)(?=:)'
+        for i, s in enumerate(chat):
+            who = re.search(regex, s)
+            if (bool(who)):
+                writtenby[i] = who.group(0)
+            else:
+                writtenby[i] = 'Sender not detected'
+
         timestamps = list()
         messages = list() 
-    
         where_not_possible = list()
-    
         for i, s in enumerate(chat): 
             timestamp = re.search(timestamp_formats[format_], s)
             if (len(s) > 0) & (bool(timestamp)):
@@ -90,8 +96,13 @@ class whatsapp_analytics():
                 s = re.sub(writtenby[i] + ': ', '', s)
                 messages.append(s)
             else: 
+                # concat parts of messages split by newline into one message.
+                # This happens when doing .split('/n') after reading the file
+                messages[-1] = messages[-1] + ' ' + s 
                 where_not_possible.append(i)
-        writtenby = [by for k, by in enumerate(list(writtenby)) if k not in where_not_possible]        
+        writtenby = [by for k, by in enumerate(list(writtenby)) if k not in where_not_possible]  
+        if 'Sender not detected' in np.unique(writtenby):
+            warnings.warn('Not in every message a sender could be detected.')
         timestamps = pd.to_datetime(timestamps, 
                                     format = timeconversion_formats[format_])
         table = pd.DataFrame({'Timestamp': timestamps, 
@@ -100,141 +111,120 @@ class whatsapp_analytics():
         table.dropna(inplace=True)
         return table
 
-    def calc_average_message_size(self, average=True):
-        my_charlens = [len(m) for m in self.my_table['Message']]
-        other_charlens = [len(m) for m in self.other_table['Message']]
-        my_wordlens = [len(m.split(' ')) for m in self.my_table['Message']]
-        other_wordlens = [len(m.split(' ')) for m in self.other_table['Message']]
-        
-        resdict = {}
-        if average:
-            resdict[self.my_name + '_charlen'] = self.meanround(my_charlens)
-            resdict[self.other_name + '_charlen'] = self.meanround(other_charlens)
-            resdict[self.my_name + '_wordlen'] = self.meanround(my_wordlens)
-            resdict[self.other_name + '_wordlen'] = self.meanround(other_wordlens)
-        else:
-            resdict[self.my_name + '_charlen'] = my_charlens
-            resdict[self.other_name + '_charlen'] = other_charlens
-            resdict[self.my_name + '_wordlen'] = my_wordlens
-            resdict[self.other_name + '_wordlen'] = other_wordlens
-        
-        return resdict
+
+    def calc_message_sizes(self):
+        worddict = {}
+        chardict = {}
+        for table in self.tables:
+            name = table['Written_by'].iloc[0]
+            wordlens = pd.Series([len(m.split(' ')) for m in table['Message']])
+            charlens = pd.Series([len(m) for m in table['Message']])
+            worddict[name] = wordlens
+            chardict[name] = charlens
+        return {'Wordlengths': worddict, 'Charlengths': chardict}
+  
     
-    
-    def plot_dist_of_message_size(self, words=False, nb_mode=False):
+    def plot_dist_of_message_size(self, words_or_chars='words', nb_mode=False):
         
-        messages_sizes = self.calc_average_message_size(average=False)
+        message_sizes = self.calc_message_sizes()
         layout = layout_for_plots
-        if words:
-            my_sizes = messages_sizes[self.my_name + '_wordlen']
-            other_sizes = messages_sizes[self.other_name + '_wordlen']
+        if words_or_chars == 'words':
+            message_sizes = message_sizes['Wordlengths']
             layout['title'] = 'Distribution of message lengths in words'
         else:
-            my_sizes = messages_sizes[self.my_name + '_charlen']
-            other_sizes = messages_sizes[self.other_name + '_charlen']
+            message_sizes = message_sizes['Charlenghts']
             layout['title'] = 'Distribution of message lengths in characters'
-        xmax = np.max([np.max(my_sizes), np.max(other_sizes)])
-        bins = dict(start=0, end=xmax, size=xmax/30)
-        trace = [go.Histogram(x=my_sizes, name=self.my_name, xbins=bins),
-                 go.Histogram(x=other_sizes, name=self.other_name, xbins=bins)]
-        fig = go.Figure(trace, layout)
+          
+        maxs = list()
+        for key in message_sizes.keys():
+            maxs.append(np.max(message_sizes[key]))
+        xmax = np.max(maxs)
+        bins = dict(start=0, end=xmax, size=xmax/30)    
+        
+        traces = list()
+        for key in message_sizes.keys():
+            hist = go.Histogram(x=message_sizes[key], name=key, xbins=bins)
+            traces.append(hist)
+    
+        fig = go.Figure(traces, layout)
         if nb_mode:
             return fig
         plot(fig)
         
         
     def show_summary_statistics(self):
-        my_stuff = {}
-        other_stuff = {}
-        sizes_dict = self.calc_average_message_size()
-        resptimes_dict = self.calc_average_respond_time()
-        my_stuff['Messages send'] = self.my_table.shape[0]
-        other_stuff['Messages send'] = self.other_table.shape[0]
-        my_stuff['Average message size in words'] = \
-            sizes_dict[self.my_name + '_wordlen']
-        other_stuff['Average message size in words'] = \
-            sizes_dict[self.other_name + '_wordlen']
-        my_stuff['Average message size in characters'] = \
-            sizes_dict[self.my_name + '_charlen']
-        other_stuff['Average message size in characters'] = \
-            sizes_dict[self.other_name + '_charlen']
-        my_stuff['Average respond time for all messages (minutes)'] = \
-            resptimes_dict[self.my_name]
-        other_stuff['Average respond time for all messages (minutes)'] = \
-            resptimes_dict[self.other_name]
-        my_stuff['Average respond time for intraday messages (minutes)'] = \
-            resptimes_dict[self.my_name + '_intraday']
-        other_stuff['Average respond time for intraday messages (minutes)'] = \
-            resptimes_dict[self.other_name + '_intraday']
-        table = pd.DataFrame({'a': np.fromiter(my_stuff.values(), dtype='float64'), 
-                              'b': np.fromiter(other_stuff.values(), dtype='float64')})
-        table.columns = [self.my_name, self.other_name]
-        table.index = my_stuff.keys()
-        self.summary_stats = table
-        return table
+        
+        message_sizes = self.calc_message_sizes()
+        resptimes = self.calc_respond_time()
+        summaries = list()
+        for name, table in zip(self.names, self.tables):
+            stats = {}
+            stats['Number messages sent'] = table.shape[0]
+            av_wordlens = self.meanround(message_sizes['Wordlengths'][name])
+            av_charlens = self.meanround(message_sizes['Charlengths'][name])
+            stats['Average message size in words'] = av_wordlens
+            stats['Average message size in characters'] = av_charlens
+            av_resp_all = self.meanround(resptimes['All_messages'][name])
+            av_resp_id = self.meanround(resptimes['Only_intraday'][name])
+            stats['Average respond time for all messages (minutes)'] = av_resp_all
+            stats['Average respond time for intraday messages (minutes)'] = av_resp_id
+            series = pd.Series(np.fromiter(stats.values(), dtype='float64'))
+            series.index = stats.keys()
+            summaries.append(series)
+        
+        restable = pd.concat(summaries, axis=1, sort=False)
+        restable.columns = self.names
+        return restable
+    
     
     def plot_dist_of_respondtimes(self, tail=False, nb_mode=False):
-        resptimes = self.calc_average_respond_time(average=False)
-        my_times = resptimes[self.my_name]
-        other_times = resptimes[self.other_name]
         
+        resptimes = self.calc_respond_time()['All_messages']
         layout = layout_for_plots
-        
         if tail:
-            xmax = np.max([np.max(my_times), np.max(other_times)])
+            maxs = list()
+            for key in resptimes.keys():
+                maxs.append(np.max(resptimes[key]))
+            xmax = np.max(maxs)
             bins =dict(start=30, size=xmax/30)
             layout['title'] = 'Distribution of long time respond time in minutes'
-        else:
-            xmax = np.max([np.max(my_times), np.max(other_times)])
+        else: 
             bins = dict(start=0, end=30, size=1)
             layout['title'] = 'Distribution of short time respond time in minutes'
-        my_hist = go.Histogram(x=my_times, xbins=bins, name=self.my_name)
-        other_hist =go.Histogram(x=other_times, xbins=bins, name=self.other_name)
-        trace = [my_hist, other_hist]
-        fig = go.Figure(trace, layout)
+        
+        traces = list()
+        for key in resptimes.keys():
+            hist = go.Histogram(x=resptimes[key], xbins=bins, name=key)
+            traces.append(hist)
+
+        fig = go.Figure(traces, layout)
         if nb_mode:
             return fig
         plot(fig)
         
     
-    def calc_average_respond_time(self, average=True):
+    def calc_respond_time(self):
         
-        my_diffs = list()
-        other_diffs = list()
-        my_diffs_intraday = list()
-        other_diffs_intraday = list()
+        diffs = {}
+        diffs_intraday = {}
+        for name in self.names:
+            diffs[name] = list()
+            diffs_intraday[name] = list()
         
         for i in range(1, self.df.shape[0]):
-            
             now = self.df['Timestamp'][i]
             last = self.df['Timestamp'][i - 1]
             now_pers = self.df['Written_by'][i]
             last_pers = self.df['Written_by'][i - 1]
             diff = now - last
             
-            if (now_pers == self.my_name) & (last_pers == self.other_name):
-                my_diffs.append(diff.total_seconds()/60)
-                if (now.date() == last.date()):
-                    my_diffs_intraday.append(diff.total_seconds()/60)
-            if (now_pers == self.other_name) & (last_pers == self.my_name):
-                other_diffs.append(diff.total_seconds()/60)
-                if (now.date() == last.date()):
-                    other_diffs_intraday.append(diff.total_seconds()/60)
-      
-        resdict = {}
-        if average:
-            resdict[self.my_name] = self.meanround(my_diffs)
-            resdict[self.other_name] = self.meanround(other_diffs)
-            resdict[self.my_name + '_intraday'] = self.meanround(my_diffs_intraday)
-            resdict[self.other_name + '_intraday'] = self.meanround(other_diffs_intraday)
-        else:
-            resdict[self.my_name] = self.onlypospart(my_diffs)
-            resdict[self.other_name] = self.onlypospart(other_diffs)
-            resdict[self.my_name + '_intraday'] = self.onlypospart(my_diffs_intraday)
-            resdict[self.other_name + '_intraday'] = self.onlypospart(other_diffs_intraday)
+            if (now_pers != last_pers): # so its considered to be a response
+                diffs[now_pers].append(diff.total_seconds()/60)
+                if (now.date() == last.date()): 
+                    diffs_intraday[now_pers].append(diff.total_seconds()/60)
         
-        return resdict
-          
+        return {'All_messages': diffs, 'Only_intraday': diffs_intraday}
+     
     
     def meanround(self, x):
         return np.round(np.mean(x), decimals=3)
@@ -251,31 +241,36 @@ class whatsapp_analytics():
             date = datetime(date.year, date.month, date.day, 
                             date.hour, min_step*(date.minute // min_step))
             return date.time()
-       
-        self.my_table['Timestamp_tmp'] = self.my_table['Timestamp'].apply(convert)
-        self.other_table['Timestamp_tmp'] = self.other_table['Timestamp'].apply(convert)
         
-        my_times = np.sort(self.my_table['Timestamp_tmp'])
-        other_times = np.sort(self.other_table['Timestamp_tmp'])
-        trace = [go.Histogram(x=my_times, name=self.my_name), 
-                 go.Histogram(x=other_times, name=self.other_name)]
+        traces = list()
+        for table in self.tables:
+            table_copy = table.copy(deep=True)
+            table_copy['Timestamp'] = table_copy['Timestamp'].apply(convert)
+            name = table_copy['Written_by'].iloc[0]
+            hist = go.Histogram(x=np.sort(table_copy['Timestamp']), 
+                                name = name)
+            traces.append(hist)
+            del table_copy
+ 
         layout = layout_for_plots
         layout['title'] = 'Distribution of messages during the day'
-        fig = go.Figure(trace, layout)
+        fig = go.Figure(traces, layout)
         if nb_mode:
             return fig
         plot(fig)
-        self.my_table.drop(['Timestamp_tmp'], axis=1, inplace=True)
-        self.other_table.drop(['Timestamp_tmp'], axis=1, inplace=True)
         
     
-    def plot_wordcloud(self, who='my_name'):
+    def plot_wordcloud(self, who='all'):
         
-        if (who == self.my_name) or (who == 'my_name'):
-            df = self.my_table
+        if who == 'all':
+            df = self.df
         else:
-            df = self.other_table
-        
+            try:
+                df = self.df.loc[self.df['Written_by'] == who, :]
+            except ValueError:
+                print('The name you entered does not occur in the chat.'
+                      'Check .names attribute to see all possibe names')
+                
         text = ' '.join(df['Message']).lower()
         stopwords = get_stop_words(self.languages[0])
         if len(self.languages) > 1:
@@ -294,22 +289,29 @@ class whatsapp_analytics():
     
     def plot_most_used_emojis(self, nb_mode=False):
     
-        
-        my_smilies = self.extract_emojis(self.my_table['Message'])
-        my_freq = pd.Series(my_smilies).value_counts()[0:10]
-        
-        other_smilies = self.extract_emojis(self.other_table['Message'])
-        other_freq = pd.Series(other_smilies).value_counts()[0:10]
-        
-        freq = pd.concat([my_freq, other_freq], axis=1).fillna(0)
-        ind = np.flip(np.argsort(freq.iloc[:, 0] + freq.iloc[:, 1]))
-        freq = freq.iloc[ind.values, :]
- 
-        trace = [go.Bar(x=freq.index, y=freq.iloc[:,0], name=self.my_name),
-                 go.Bar(x=freq.index, y=freq.iloc[:,1], name=self.other_name)]
+        freqs = list()
+        names = list()
+        for table in self.tables:
+            smilies = self.extract_emojis(table['Message'])
+            freqs.append(pd.Series(smilies).value_counts()[0:10])
+            names.append(table['Written_by'].iloc[0])
+            
+        # the following is done to sort the emojis by sum of usage of all 
+        # persons in the chat
+        freqs = pd.concat(freqs, axis=1, sort=True).fillna(0)
+        vec = np.zeros(freqs.shape[0])
+        for i in range(freqs.shape[1]):
+            vec += freqs.iloc[:, i]
+            
+        ind = np.flip(np.argsort(vec))
+        freqs = freqs.iloc[ind.values, :]
+        traces = list()
+        for i in range(freqs.shape[1]):
+            bar = go.Bar(x=freqs.index, y=freqs.iloc[:, i], name=names[i])
+            traces.append(bar)
         layout = layout_for_plots
         layout['title'] = 'Most used emojis'
-        fig = go.Figure(trace, layout)
+        fig = go.Figure(traces, layout)
         if nb_mode:
             return fig
         plot(fig)
@@ -380,20 +382,4 @@ class whatsapp_analytics():
             
             
             
-            
-            
-            
-            
-            
-            
-path1 = '/home/nicolas/Escritorio/PyProjects/whatsappalytics/data/FelixVonFelix.txt'
-path2 = '/home/nicolas/Escritorio/PyProjects/whatsappalytics/data/Kevin Nürnberg.txt'  
-
-
-x1 = whatsapp_analytics('Felix', 'Nicolas Keller', path1)
-
-with open(path2) as file:
-    chat2 = file.read().split('\n')[:-1]
- 
-
             
