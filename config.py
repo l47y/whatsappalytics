@@ -32,4 +32,21 @@ layout_for_plots = go.Layout(
     )          
                 
                 
-    
+strings_to_exclude = [
+     '<Medien ausgeschlossen>',   
+     'Audio weggelassen',
+     'Ende-zu-Ende-Verschlüsselung',
+]
+
+
+
+
+
+
+
+
+
+
+
+
+

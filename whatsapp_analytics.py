@@ -7,7 +7,7 @@ import plotly.figure_factory as ff
 import plotly.graph_objs as go
 import emoji
 import matplotlib.pyplot as plt
-from config import layout_for_plots
+from config import layout_for_plots, strings_to_exclude
 from wordcloud import WordCloud
 from stop_words import get_stop_words
 
@@ -16,57 +16,60 @@ from stop_words import get_stop_words
 
 class whatsapp_analytics():
     
-    def __init__(self, my_name, other_name, path=None, text=None,
-                 languages=['german']):
+    def __init__(self, my_name, other_name, path=None, languages=['german']):
         self.my_name = my_name
         self.other_name = other_name
-        if text != None:
-            self.df = self.whatsapp_to_df(self.my_name, self.other_name,
-                                          whatsapp_text=text)
-        else:  
-            self.path = path
-            self.df = self.whatsapp_to_df(self.my_name, self.other_name, 
-                                          self.path)
+        self.path = path
+        self.df = self.whatsapp_to_df(self.my_name, self.other_name, self.path)
         self.my_table = self.df.loc[self.df['Written_by'] == my_name, :]
         self.other_table = self.df.loc[self.df['Written_by'] == other_name, :]
         self.languages = languages
 
         
-    def replace_german_umlaute(text):
-        umlaute_dict = {
-            '\\xc3\\xa4': 'ae',  
-            '\\xc3\\xb6': 'oe',  
-            '\\xc3\\xbc': 'ue', 
-            '\\xc3\\x84': 'Ae',  
-            '\\xc3\\x96': 'Oe', 
-            '\\xc3\\x9c': 'Ue', 
-            '\\xc3\\x9f': 'ss',
-        }
-        for k in umlaute_dict.keys():
-            text = text.replace(k, umlaute_dict[k])
-        return text
-        
-        
     def whatsapp_to_df(self, my_name, other_name, path_of_whatsapp_text=None,
-                       whatsapp_text=None, 
-                       no_media_string = '<Medien ausgeschlossen>'):
+                       exclude = strings_to_exclude):
         '''
         Takes a whatsapp chat backup and cleanse it and makes a table with
-        timestamp, written by, message columns
+        timestamp, written by, message columns. If the function is unable to
+        detect the format of the given chat, an error raises. 
         
         Args:
         my_name -- My whatsapp name like it appears in the original file
         other_name -- Name of chat partner like it appears in original file
         path_of_whatsapp_text -- Path where to find the original text file
         '''
-        
-        if whatsapp_text != None:
-            chat = whatsapp_text.split('/n')[:-1]
-        else:
-            with open(path_of_whatsapp_text) as file:
-                chat = file.read().split('\n')[:-1]
+
+        with open(path_of_whatsapp_text) as file:
+            chat = file.read().split('\n')[:-1]
        
-        chat = [message for message in chat if no_media_string not in message]
+        formats = {'iphone': '\[\d\d\.\d\d\.\d\d\,\ \d\d:\d\d:\d\d\] ',
+           'android': '\\d\\d\\.\\d\\d\\.\\d\\d, \\d\\d:\\d\\d - '}    
+        timestamp_formats = {'iphone': '\d\d\.\d\d\.\d\d\,\ \d\d:\d\d:\d\d',
+                             'android': '\\d\\d\\.\\d\\d\\.\\d\\d, \\d\\d:\\d\\d'}     
+        timeconversion_formats = {'iphone': '%d.%m.%y, %H:%M:%S',
+                                  'android': '%d.%m.%y, %H:%M'}
+        
+        # extract the format of a given message
+        def extract_format(message_string):
+            for f, string in formats.items():
+                if bool(re.search(string, message_string)):
+                    return(f)
+                    
+        # checks if the format of the first x messages is equal 
+        def format_consistency_check(messages):
+            found_formats = np.empty(10, dtype='U24') 
+            for i in range(len(messages)):
+                found_formats[i] = extract_format(messages[i])
+            if any([len(np.unique(found_formats)) > 1,
+                    len(np.unique(found_formats)) < 1]):
+                raise ValueError('The provided chat format is not known yet.')
+            return np.unique(found_formats)[0]  
+        
+        format_ = format_consistency_check(chat[0:10])
+
+        for string in exclude:
+            chat = [message for message in chat if string not in message]
+      
         where_my_name = [my_name in s for s in chat]
         where_other_name = [not b for b in where_my_name]
         writtenby = np.empty(len(chat), dtype='U24')
@@ -79,17 +82,19 @@ class whatsapp_analytics():
         where_not_possible = list()
     
         for i, s in enumerate(chat): 
-            timestamp = re.search('\\d\\d\\.\\d\\d\\.\\d\\d, \\d\\d:\\d\\d', s)
+            timestamp = re.search(timestamp_formats[format_], s)
             if (len(s) > 0) & (bool(timestamp)):
                 timestamp = timestamp.group(0)
                 timestamps.append(timestamp)
-                s = re.sub('\\d\\d\\.\\d\\d\\.\\d\\d, \\d\\d:\\d\\d - ', '', s)
+                s = re.sub(formats[format_], '', s)
                 s = re.sub(writtenby[i] + ': ', '', s)
                 messages.append(s)
             else: 
                 where_not_possible.append(i)
         writtenby = [by for k, by in enumerate(list(writtenby)) if k not in where_not_possible]        
-        table = pd.DataFrame({'Timestamp': pd.to_datetime(timestamps, format='%d.%m.%y, %H:%M'), 
+        timestamps = pd.to_datetime(timestamps, 
+                                    format = timeconversion_formats[format_])
+        table = pd.DataFrame({'Timestamp': timestamps, 
                               'Written_by': writtenby, 
                               'Message': messages})
         table.dropna(inplace=True)
@@ -372,5 +377,23 @@ class whatsapp_analytics():
                 
         return pd.DataFrame({'Last_message': last_messages, 
                              'Answer': answers})
+            
+            
+            
+            
+            
+            
+            
+            
+            
+path1 = '/home/nicolas/Escritorio/PyProjects/whatsappalytics/data/FelixVonFelix.txt'
+path2 = '/home/nicolas/Escritorio/PyProjects/whatsappalytics/data/Kevin Nürnberg.txt'  
 
 
+x1 = whatsapp_analytics('Felix', 'Nicolas Keller', path1)
+
+with open(path2) as file:
+    chat2 = file.read().split('\n')[:-1]
+ 
+
+            
