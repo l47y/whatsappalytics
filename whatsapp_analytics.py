@@ -11,11 +11,12 @@ from config import layout_for_plots, strings_to_exclude
 from wordcloud import WordCloud
 from stop_words import get_stop_words
 import warnings
+from copy import copy
 
 
 
 
-class whatsapp_analytics():
+class Whatsapp_Analytics():
     
     def __init__(self, path, languages=['german']):
         self.path = path
@@ -47,7 +48,7 @@ class whatsapp_analytics():
             chat = file.read().split('\n')[:-1]
        
         formats = {'iphone': '\[\d\d\.\d\d\.\d\d\,\ \d\d:\d\d:\d\d\] ',
-           'android': '\\d\\d\\.\\d\\d\\.\\d\\d, \\d\\d:\\d\\d - '}    
+                   'android': '\\d\\d\\.\\d\\d\\.\\d\\d, \\d\\d:\\d\\d - '}    
         timestamp_formats = {'iphone': '\d\d\.\d\d\.\d\d\,\ \d\d:\d\d:\d\d',
                              'android': '\\d\\d\\.\\d\\d\\.\\d\\d, \\d\\d:\\d\\d'}     
         timeconversion_formats = {'iphone': '%d.%m.%y, %H:%M:%S',
@@ -61,9 +62,14 @@ class whatsapp_analytics():
                     
         # checks if the format of the first x messages is equal 
         def format_consistency_check(messages):
-            found_formats = np.empty(10, dtype='U24') 
+            found_formats = list() 
             for i in range(len(messages)):
-                found_formats[i] = extract_format(messages[i])
+                
+                # If newline in one message than no format will be found.
+                # So here will be checked if the first char is a letter and 
+                # if yes, the loop skips this. 
+                if not bool(re.search('[A-Z, a-z]', messages[i][0])):
+                    found_formats.append(extract_format(messages[i]))
             if any([len(np.unique(found_formats)) > 1,
                     len(np.unique(found_formats)) < 1]):
                 raise ValueError('The provided chat format is not known yet.')
@@ -109,6 +115,7 @@ class whatsapp_analytics():
                               'Written_by': writtenby, 
                               'Message': messages})
         table.dropna(inplace=True)
+        table = table.loc[table['Written_by'] != 'Sender not detected']
         return table
 
 
@@ -127,7 +134,7 @@ class whatsapp_analytics():
     def plot_dist_of_message_size(self, words_or_chars='words', nb_mode=False):
         
         message_sizes = self.calc_message_sizes()
-        layout = layout_for_plots
+        layout = copy(layout_for_plots)
         if words_or_chars == 'words':
             message_sizes = message_sizes['Wordlengths']
             layout['title'] = 'Distribution of message lengths in words'
@@ -153,7 +160,6 @@ class whatsapp_analytics():
         
         
     def show_summary_statistics(self):
-        
         message_sizes = self.calc_message_sizes()
         resptimes = self.calc_respond_time()
         summaries = list()
@@ -180,7 +186,7 @@ class whatsapp_analytics():
     def plot_dist_of_respondtimes(self, tail=False, nb_mode=False):
         
         resptimes = self.calc_respond_time()['All_messages']
-        layout = layout_for_plots
+        layout = copy(layout_for_plots)
         if tail:
             maxs = list()
             for key in resptimes.keys():
@@ -212,10 +218,11 @@ class whatsapp_analytics():
             diffs_intraday[name] = list()
         
         for i in range(1, self.df.shape[0]):
-            now = self.df['Timestamp'][i]
-            last = self.df['Timestamp'][i - 1]
-            now_pers = self.df['Written_by'][i]
-            last_pers = self.df['Written_by'][i - 1]
+            
+            now = self.df['Timestamp'].iloc[i]
+            last = self.df['Timestamp'].iloc[i - 1]
+            now_pers = self.df['Written_by'].iloc[i]
+            last_pers = self.df['Written_by'].iloc[i - 1]
             diff = now - last
             
             if (now_pers != last_pers): # so its considered to be a response
@@ -252,7 +259,7 @@ class whatsapp_analytics():
             traces.append(hist)
             del table_copy
  
-        layout = layout_for_plots
+        layout = copy(layout_for_plots)
         layout['title'] = 'Distribution of messages during the day'
         fig = go.Figure(traces, layout)
         if nb_mode:
@@ -287,6 +294,37 @@ class whatsapp_analytics():
         plt.show()
    
     
+    def plot_dist_of_weekdays(self, nb_mode=False):
+         
+        traces = list()
+        weekdays = {'1': 'Monday', 
+                    '2': 'Tuesdays', 
+                    '3': 'Wednesday', 
+                    '4': 'Thursday', 
+                    '5': 'Friday',
+                    '6': 'Saturday', 
+                    '7': 'Sunday'}
+        for i in range(len(self.names)):
+            t = self.tables[i].copy(deep=True)
+            t['Timestamp'] = [x.isoweekday() for x in t['Timestamp']]
+            t['Timestamp'] = t['Timestamp'].apply(str).replace(weekdays)
+            grouped = t.groupby('Timestamp').size()
+            bar = go.Bar(x=grouped.index, y=grouped, name=self.names[i])
+            traces.append(bar)
+          
+        layout = copy(layout_for_plots)
+        layout['title'] = 'Distribution of sent messages over weekdays'
+        layout['xaxis'] = {
+            'categoryorder': 'array',
+            'categoryarray': [x for _, x in sorted(zip(weekdays.keys(), 
+                                                       weekdays.values()))]
+        }
+        fig = go.Figure(data=traces, layout=layout)
+        if nb_mode:
+            return fig
+        plot(fig)
+        
+    
     def plot_most_used_emojis(self, nb_mode=False):
     
         freqs = list()
@@ -309,13 +347,93 @@ class whatsapp_analytics():
         for i in range(freqs.shape[1]):
             bar = go.Bar(x=freqs.index, y=freqs.iloc[:, i], name=names[i])
             traces.append(bar)
-        layout = layout_for_plots
+        layout = copy(layout_for_plots)
         layout['title'] = 'Most used emojis'
         fig = go.Figure(traces, layout)
         if nb_mode:
             return fig
         plot(fig)
         
+
+    def plot_overall_participition(self, nb_mode=False):
+        
+        days = self.df['Timestamp'].copy(deep=True)
+        days = np.unique([x.date() for x in days])
+        perc_mes = list()
+        perc_days = list()
+        for i in range(len(self.names)):
+            tab = self.tables[i].copy(deep=True)
+            perc_mes.append(tab.shape[0] / self.df.shape[0])
+            days_person = [x.date() for x in tab['Timestamp']]
+            perc_days.append(len(np.unique(days_person)) / len(days))
+        
+        pie1 = {
+            'values': perc_mes,
+            'labels': self.names,
+            'domain': {'x': [0, .48]},
+            'hoverinfo':'label+percent+name',
+            'hole': .4,
+            'type': 'pie',
+            'name': 'Percentage of messages sent',
+            }
+        pie2 = { 
+            'values': perc_days,
+            'labels': self.names,
+            "domain": {"x": [.52, 1]},
+            'hoverinfo':'label+percent+name',
+            'hole': .4,
+            'type': 'pie',
+            'name': 'Percentage of days of participation',
+            }
+
+        layout = copy(layout_for_plots)
+        layout['title'] = 'Percentage of participation'
+        layout['annotations'] = [
+            {
+                'font': {
+                    'size': 22
+                },
+                'showarrow': False,
+                'text': 'Messages',
+                'x': 0.20,
+                'y': 0.5
+            },
+            {
+                'font': {
+                    'size': 22
+                },
+                'showarrow': False,
+                'text': 'Days',
+                'x': 0.775,
+                'y': 0.5
+            }
+        ]
+        fig = go.Figure(data=[pie1, pie2], layout=layout)
+        if nb_mode:
+            return fig
+        plot(fig)
+
+
+    def plot_chronology(self, nb_mode=False):
+        
+        traces = list()
+        
+        for i in range(len(self.names)):
+            t = self.tables[i].copy(deep=True)
+            t.Timestamp = [x.date() for x in t.Timestamp]
+            grouped = t.groupby('Timestamp').size()
+            scat = go.Scatter(x=grouped.index, y=grouped, mode='lines+markers', 
+                              name=self.names[i])
+            traces.append(scat)
+
+        layout = copy(layout_for_plots)
+        layout['title'] = 'Number of messages sent over time'
+        fig = go.Figure(data=traces, layout=layout)
+        if nb_mode:
+            return fig
+        plot(fig)
+
+  #  def get_number_messages_da
 
     def extract_emojis(self, messages):
         emojis_all = list()
@@ -380,6 +498,6 @@ class whatsapp_analytics():
         return pd.DataFrame({'Last_message': last_messages, 
                              'Answer': answers})
             
-            
-            
-            
+
+
+
