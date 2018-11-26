@@ -391,16 +391,16 @@ class Whatsapp_Analytics():
         layout['annotations'] = [
             {
                 'font': {
-                    'size': 22
+                    'size': 17
                 },
                 'showarrow': False,
                 'text': 'Messages',
-                'x': 0.20,
+                'x': 0.2130,
                 'y': 0.5
             },
             {
                 'font': {
-                    'size': 22
+                    'size': 17
                 },
                 'showarrow': False,
                 'text': 'Days',
