@@ -36,6 +36,8 @@ strings_to_exclude = [
      '<Medien ausgeschlossen>',   
      'Audio weggelassen',
      'Ende-zu-Ende-Verschlüsselung',
+     'Media omitted',
+     'Audio omitted',
 ]
 
 

@@ -18,9 +18,11 @@ from copy import copy
 
 class Whatsapp_Analytics():
     
-    def __init__(self, path, languages=['german']):
+    def __init__(self, path, languages=['german'], 
+                 exclude = strings_to_exclude):
         self.path = path
-        self.df = self.whatsapp_to_df(self.path)
+        self.exclude = exclude
+        self.df = self.whatsapp_to_df(self.path, exclude=self.exclude)
         tables = list()
         names = list()
         for name in np.unique(self.df['Written_by']):
@@ -29,10 +31,11 @@ class Whatsapp_Analytics():
         self.tables = tables
         self.names = names
         self.languages = languages
+        
 
         
     def whatsapp_to_df(self, path_of_whatsapp_text=None,
-                       exclude = strings_to_exclude):
+                       exclude = []):
         '''
         Takes a whatsapp chat backup and cleanse it and makes a table with
         timestamp, written by, message columns. If the function is unable to
