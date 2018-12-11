@@ -1,10 +1,25 @@
-
 from plotly import graph_objs as go
+import numpy as np
 
-# unified plot design
+
+def convert_rgb_to_plotlycolor(rgb_vec):
+    '''
+    This function converts a rgb color vector into a string which will be 
+    accpeted by plotly as a color.
+    '''
+    string = 'rgba(' + str(rgb_vec[0]) + ', ' + str(rgb_vec[1]) + ', ' + \
+            str(rgb_vec[2]) + ', ' + str(1) + ')'
+    return string
+
+
+# Set the background grey tone
+grey_tone = 25
+background_col = convert_rgb_to_plotlycolor(np.repeat(grey_tone, 3))
+
+# Define a unified plot format which will be used by every plot
 layout_for_plots = go.Layout(
-    paper_bgcolor='black',
-    plot_bgcolor='black',
+    paper_bgcolor=background_col,
+    plot_bgcolor=background_col,
     xaxis=dict(
         titlefont=dict(
             size=18,
@@ -14,7 +29,8 @@ layout_for_plots = go.Layout(
         tickfont=dict(
             size=14,
             color='white'),
-        automargin=True),
+        automargin=True
+        ),
     yaxis=dict(
         titlefont=dict(
             size=18,
@@ -27,20 +43,48 @@ layout_for_plots = go.Layout(
             color='white'
         )),
     font=dict(
-        size=22,
+        size=32,
         color='white')
     )          
                 
-                
+   
+# Some default strings which will be excluded later              
 strings_to_exclude = [
      '<Medien ausgeschlossen>',   
      'Audio weggelassen',
      'Ende-zu-Ende-Verschlüsselung',
      'Media omitted',
      'Audio omitted',
+     'Hat die Gruppe verlassen',
+     'Verpasster Sprachanruf',
+     'Media omitida', 
+     'Audio omitido',
+     'extremo a extremo',
+     'Verpasster Videoanruf',
+     'Verpasster Sprachanruf',
+     'Imagen omitida',
 ]
 
 
+# A list of colors. Later randomly there will be picked x colors of this list
+# where x stands for the number of chat participants. Note that with more than
+# len(nice_colors) participants, the same color will be assigned to different
+# participants.
+nice_colors = [
+   [255, 0, 127], 
+   [127, 0, 255],
+   [0, 128, 255],
+   [0, 255, 255],
+   [0, 255, 128],
+   [255, 255, 153],
+   [255, 153, 204],
+   [204, 153, 255],
+   [153, 153, 255],
+   [255, 153, 153],
+   [255, 153, 255],
+   [153, 255, 204]]
+       
+nice_colors = [convert_rgb_to_plotlycolor(c) for c in nice_colors]
 
 
 
