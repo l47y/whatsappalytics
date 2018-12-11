@@ -55,7 +55,6 @@ strings_to_exclude = [
      'Ende-zu-Ende-Verschlüsselung',
      'Media omitted',
      'Audio omitted',
-     'Hat die Gruppe verlassen',
      'Verpasster Sprachanruf',
      'Media omitida', 
      'Audio omitido',
@@ -67,9 +66,7 @@ strings_to_exclude = [
 
 
 # A list of colors. Later randomly there will be picked x colors of this list
-# where x stands for the number of chat participants. Note that with more than
-# len(nice_colors) participants, the same color will be assigned to different
-# participants.
+# where x stands for the number of chat participants. 
 nice_colors = [
    [255, 0, 127], 
    [127, 0, 255],

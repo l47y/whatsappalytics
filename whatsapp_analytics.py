@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 from config import layout_for_plots, strings_to_exclude, nice_colors
 from wordcloud import WordCloud
 from stop_words import get_stop_words
-import warnings
 from copy import copy
+import random
 
 
 
@@ -31,7 +31,7 @@ class Whatsapp_Analytics():
         self.names = names
         self.languages = languages
         
-        ind = np.random.choice(np.arange(0, len(nice_colors)), len(self.names))
+        ind = random.sample(range(len(nice_colors)), len(self.names))
         self.colors = [nice_colors[i] for i in ind]
      
         
@@ -47,7 +47,7 @@ class Whatsapp_Analytics():
         exclude -- A list of strings, where every message which contains one
                    or more of the strings in exclude will be ignored. This is
                    intended to be used to exclude the messages which are sent
-                   by whatsapp itself (for example: xx left the group) or when 
+                   by whatsapp itself (for example: media omitted) or when 
                    you want to ignore some kind of "private" messages.
         '''
 
@@ -97,41 +97,40 @@ class Whatsapp_Analytics():
         # Finally append the format attribute to the object
         format_ = format_consistency_check(chat[0:10])
         self.format = format_
+        
+        # Delete messages which contain some of the strings in exclude
         for string in exclude:
             chat = [message for message in chat if string not in message]
       
-        # Extract the sender of the message and through a warning if not 
-        # in every message a sender could be detected
-        writtenby = np.empty(len(chat), dtype='U24')
-        for i, s in enumerate(chat):
-            if bool(re.search(formats[format_], s)):
-                after_format = re.split(formats[format_], s)[1]
-                writtenby[i] = after_format.split(':')[0]
-            else:
-                writtenby[i] = 'Sender not detected'
-        if 'Sender not detected' in np.unique(writtenby):
-            warnings.warn('Not in every message a sender could be detected.')
-            
-        # Get the messages and its corresponding timestamps      
+        # Initialize a list for every column
         timestamps = list()
         messages = list() 
-        where_not_possible = list()
+        writtenby = list()
+        
         for i, s in enumerate(chat): 
             timestamp = re.search(timestamp_formats[format_], s)
             if (len(s) > 0) & (bool(timestamp)):
+                
+                after_format = re.split(formats[format_], s)[1]
+                
+                # If the ":" not in a message than the message is from whatsapp
+                # ifself like "xx has left the group"
+                if ':' not in after_format:
+                    continue
+                else:
+                    who = after_format.split(':')[0]
+                    writtenby.append(who)
+                
                 timestamp = timestamp.group(0)
                 timestamps.append(timestamp)
                 s = re.sub(formats[format_], '', s)
-                s = re.sub(writtenby[i] + ': ', '', s)
+                s = re.sub(who + ': ', '', s)
                 messages.append(s)
             else: 
                 # concat parts of messages split by newline into one message.
                 # This happens when doing .split('/n') after reading the file
                 messages[-1] = messages[-1] + ' ' + s 
-                where_not_possible.append(i)
         
-        writtenby = [by for k, by in enumerate(list(writtenby)) if k not in \
-                     where_not_possible]  
         timestamps = pd.to_datetime(timestamps, 
                                     format = timeconversion_formats[format_])
         
