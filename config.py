@@ -13,7 +13,7 @@ def convert_rgb_to_plotlycolor(rgb_vec):
 
 
 # Set the background grey tone
-grey_tone = 25
+grey_tone = 50
 background_col = convert_rgb_to_plotlycolor(np.repeat(grey_tone, 3))
 
 # Define a unified plot format which will be used by every plot
@@ -43,9 +43,10 @@ layout_for_plots = go.Layout(
             color='white'
         )),
     font=dict(
-        size=32,
-        color='white')
-    )          
+        size=20,
+        color='white'),
+    height=800,
+ )          
                 
    
 # Some default strings which will be excluded later              
