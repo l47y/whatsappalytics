@@ -1,10 +1,7 @@
-import io
-import base64
 import flask
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-import dash_table_experiments as dt
 from dash.dependencies import Input, Output, State
 from plotly.offline import plot
 from whatsapp_analytics import Whatsapp_Analytics
@@ -29,7 +26,7 @@ app.server.static_folder = 'static'
 # Human readable plot methods and the python string which will be
 # executed in the background when selecting one of them:
 plot_method_translations = {
-            'Chronology': 'plot_chronology',
+            'Chronology': 'plot_chronology(nb_mode=True)',
             'Message Size Distr.': 'plot_dist_of_message_size(nb_mode=True)',
             'Daily Active Time': 'plot_intraday_active_time(nb_mode=True)',
             'Distr. Over Weekdays': 'plot_dist_of_weekdays(nb_mode=True)', 
