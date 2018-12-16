@@ -16,12 +16,32 @@ import random
 
 
 class Whatsapp_Analytics():
+    '''
+    Analysis object of a whatsapp chat backup. Make a backup in the menu of 
+    a chat in your mobile and select "without media". Than place the resulting
+    .txt file somewhere. There may be a lot of formats out there of this .txt 
+    file which are not covered by this object. In the latter case, you will 
+    receive a corresponding error. 
+    
+    Args of __init__:
+    - path: Path where to find the original text file
+    - languages: List of languages which are spoken in the chat. This
+        will latebe used to exclude stopwords in the wordcloud.
+    - exclude: A list of strings, where every message which contains one
+        or more of the strings in exclude will be ignored. This is
+        intended to be used to exclude the messages which are sent
+        by whatsapp itself (for example: media omitted) or when 
+        you want to ignore some kind of "private" messages.
+    '''
     
     def __init__(self, path, languages=['german'], 
-                 exclude = strings_to_exclude):
+                 exclude = strings_to_exclude, pre_calculated_df=None):
         self.path = path
         self.exclude = exclude
-        self.df = self.whatsapp_to_df(self.path, exclude=self.exclude)
+        if pre_calculated_df is not None:
+            self.df = pre_calculated_df
+        else:
+            self.df = self.whatsapp_to_df(self.path, exclude=self.exclude)
         tables = list()
         names = list()
         for name in np.unique(self.df['Written_by']):
@@ -38,17 +58,19 @@ class Whatsapp_Analytics():
     def whatsapp_to_df(self, path_of_whatsapp_text=None,
                        exclude = strings_to_exclude):
         '''
-        Takes a whatsapp chat backup and cleanse it and makes a table with
+        Takes a path to a whatsapp chat backup and produces a clean DataFrame.
+        
+        Args: see class docstring.
+        
+        Returns: DataFrame with three columns: 
+            - Timestamp: Timestamp of message
+            - Written_by: Name of chat member who has written the message
+            - Message: Content of message
+            
+        Raises:
+        ValueError: When format of that is not recognized 
         timestamp, written by, message columns. If the function is unable to
         detect the format of the given chat, an error raises. 
-        
-        Args:
-        path_of_whatsapp_text -- Path where to find the original text file
-        exclude -- A list of strings, where every message which contains one
-                   or more of the strings in exclude will be ignored. This is
-                   intended to be used to exclude the messages which are sent
-                   by whatsapp itself (for example: media omitted) or when 
-                   you want to ignore some kind of "private" messages.
         '''
 
         with open(path_of_whatsapp_text) as file:
