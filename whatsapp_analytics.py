@@ -7,11 +7,13 @@ import plotly.graph_objs as go
 from plotly import tools
 import emoji
 import matplotlib.pyplot as plt
-from config import layout_for_plots, strings_to_exclude, nice_colors
+from config import my_plot_themes, strings_to_exclude, nice_colors
 from wordcloud import WordCloud
 from stop_words import get_stop_words
 from copy import copy
 import random
+import os
+import plotly.io as pio
 
 
 
@@ -35,7 +37,8 @@ class Whatsapp_Analytics():
     '''
     
     def __init__(self, path, languages=['german'], 
-                 exclude = strings_to_exclude, pre_calculated_df=None):
+                 exclude = strings_to_exclude, pre_calculated_df=None, 
+                 theme = 'dark'):
         self.path = path
         self.exclude = exclude
         if pre_calculated_df is not None:
@@ -53,7 +56,12 @@ class Whatsapp_Analytics():
         
         ind = random.sample(range(len(nice_colors)), len(self.names))
         self.colors = [nice_colors[i] for i in ind]
-     
+        self.theme = theme
+        if theme in my_plot_themes.keys():
+            self.plot_theme = my_plot_themes[theme]
+        else:
+            raise ValueError('Only "light" and "dark" are valid theme parameters')
+      
         
     def whatsapp_to_df(self, path_of_whatsapp_text=None,
                        exclude = strings_to_exclude):
@@ -176,7 +184,7 @@ class Whatsapp_Analytics():
                                   only_trace=False):
         
         message_sizes = self.calc_message_sizes()
-        layout = copy(layout_for_plots)
+        layout = copy(self.plot_theme)
         if words_or_chars == 'words':
             message_sizes = message_sizes['Wordlengths']
             layout['title'] = 'Distribution of message lengths in words'
@@ -202,13 +210,17 @@ class Whatsapp_Analytics():
         if nb_mode:
             return fig
         plot(fig)
+       
         
+    @staticmethod
+    def sum_two(x,y):
+        return x+y
     
     def plot_dist_of_respondtimes(self, tail=False, nb_mode=False, 
                                   only_trace=False):
         
         resptimes = self.calc_respond_time()['All_messages']
-        layout = copy(layout_for_plots)
+        layout = copy(self.plot_theme)
         if tail:
             maxs = list()
             for key in resptimes.keys():
@@ -253,7 +265,7 @@ class Whatsapp_Analytics():
             traces.append(hist)
             del table_copy
  
-        layout = copy(layout_for_plots)
+        layout = copy(self.plot_theme)
         layout['title'] = 'Distribution of messages during the day'
         if only_trace:
             return traces, layout
@@ -263,7 +275,7 @@ class Whatsapp_Analytics():
         plot(fig)
         
     
-    def plot_wordcloud(self, who='all'):
+    def plot_wordcloud(self, who='all', nb_mode=False):
         
         if who == 'all':
             df = self.df
@@ -279,15 +291,22 @@ class Whatsapp_Analytics():
         if len(self.languages) > 1:
             for i in range(1, len(self.languages)):
                 stopwords.extend(get_stop_words(self.languages[i]))
+        if self.theme == 'dark':
+            background = 'black'
+        elif self.theme == 'light':
+            background = 'white'
         wc = WordCloud(stopwords=stopwords, width=1500, height=1500,
-                       max_words=400, scale=1)
+                       max_words=400, scale=1, background_color=background)
         wc.generate(text)
         plt.figure(figsize=(16,12))
         plt.imshow(wc, interpolation='bilinear')
         plt.axis("off")
         plt.title('Wordcloud of ' + who, fontdict=dict(size=24, color='white'))
         plt.tight_layout()
-        plt.show()
+        if nb_mode:
+            return plt.gcf()
+        else:
+            plt.show()
    
     
     def plot_dist_of_weekdays(self, nb_mode=False, only_trace=False):
@@ -309,7 +328,7 @@ class Whatsapp_Analytics():
                          marker=dict(color=self.colors[i]))
             traces.append(bar)
           
-        layout = copy(layout_for_plots)
+        layout = copy(self.plot_theme)
         layout['title'] = 'Distribution of sent messages over weekdays'
         layout['xaxis'] = {
             'categoryorder': 'array',
@@ -347,7 +366,7 @@ class Whatsapp_Analytics():
             bar = go.Bar(x=freqs.index, y=freqs.iloc[:, i], name=names[i],
                          marker=dict(color=self.colors[i]))
             traces.append(bar)
-        layout = copy(layout_for_plots)
+        layout = copy(self.plot_theme)
         layout['title'] = 'Most used emojis'
         if only_trace:
             return traces, layout
@@ -390,7 +409,7 @@ class Whatsapp_Analytics():
             'marker': dict(colors=self.colors)
             }
 
-        layout = copy(layout_for_plots)
+        layout = copy(self.plot_theme)
         layout['title'] = 'Percentage of participation'
         layout['annotations'] = [
             {
@@ -433,7 +452,7 @@ class Whatsapp_Analytics():
                               marker=dict(color=self.colors[i]))
             traces.append(scat)
 
-        layout = copy(layout_for_plots)
+        layout = copy(self.plot_theme)
         layout['title'] = 'Number of messages sent over time'
         if only_trace:
             return traces, layout
@@ -486,9 +505,9 @@ class Whatsapp_Analytics():
                 fig.append_trace(trace, i + 1, 1)
                 
         fig['layout'].update(
-        font=layout_for_plots['font'],
-        paper_bgcolor=layout_for_plots['paper_bgcolor'],
-        plot_bgcolor=layout_for_plots['plot_bgcolor'], 
+        font=self.plot_theme['font'],
+        paper_bgcolor=self.plot_theme['paper_bgcolor'],
+        plot_bgcolor=self.plot_theme['plot_bgcolor'], 
         height = 900*len(plots))
     
         # Some ugly and not working code for setting the layout to the global
@@ -497,19 +516,75 @@ class Whatsapp_Analytics():
             xaxisstr = 'xaxis' + str(i + 1)
             yaxisstr = 'yaxis' + str(i + 1)
             fig['layout'][xaxisstr].update(
-                    titlefont=layout_for_plots['xaxis']['titlefont'],
-                    showticklabels=layout_for_plots['xaxis']['showticklabels'],
-                    tickfont=layout_for_plots['xaxis']['tickfont'],
-                    automargin=layout_for_plots['xaxis']['automargin'])
+                    titlefont=self.plot_theme['xaxis']['titlefont'],
+                    showticklabels=self.plot_theme['xaxis']['showticklabels'],
+                    tickfont=self.plot_theme['xaxis']['tickfont'],
+                    automargin=self.plot_theme['xaxis']['automargin'])
             fig['layout'][yaxisstr].update(
-                    titlefont=layout_for_plots['yaxis']['titlefont'],
-                    showticklabels=layout_for_plots['yaxis']['showticklabels'],
-                    tickfont=layout_for_plots['yaxis']['tickfont'],
-                    automargin=layout_for_plots['yaxis']['automargin'])
+                    titlefont=self.plot_theme['yaxis']['titlefont'],
+                    showticklabels=self.plot_theme['yaxis']['showticklabels'],
+                    tickfont=self.plot_theme['yaxis']['tickfont'],
+                    automargin=self.plot_theme['yaxis']['automargin'])
 
         if nb_mode:
             return fig
         plot(fig)
+        
+        
+    def save_all_results(self, directory=os.getcwd() + "/images/", verbose=True):
+        
+        """
+        Saves all possible plots to a directory. Even all statistics from 
+        the show_summary_statistics function are saved as a single plot.
+        
+        Args:
+        - directory: Target directory of the image files. Defaults to an 
+          "image" folder within the working directory.
+        """
+        
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        
+        not_working = ['plot_wordcloud',
+               'plot_all_possible_plots', 'plot_theme']
+        plots = [m for m in dir(self) if 'plot_' in m and m not in not_working]
+        for method in plots:
+            p = getattr(self, method)(nb_mode=True)
+            pio.write_image(p, directory + method + ".jpg", format="jpg", 
+                            height=1000, width=1000, scale=2)
+        p = self.plot_dist_of_respondtimes(tail=True, nb_mode=True)
+        pio.write_image(p, directory + "plot_dist_of_respondtimes_tail" + ".jpg", 
+                        format="jpg", height=1000, width=1000, scale=2)
+        if verbose:
+            print("Standard plots ready.")
+            
+        plt.ioff()
+        wc_all = self.plot_wordcloud(who="all", nb_mode=True)
+        wc_all.savefig(directory + "wordcloud_all.jpg", dpi=200)
+        for name in self.names:
+            wc = self.plot_wordcloud(who=name, nb_mode=True)
+            wc.savefig(directory + "wordcloud_" + name + ".jpg", dpi=200)
+        plt.ion()
+        if verbose:
+            print("Wordclouds ready.")
+
+        restable = self.show_summary_statistics()
+        for stuff in restable.index:
+            tmp = restable.loc[stuff, :]
+            traces = list()
+            for name, color in zip(self.names, self.colors):
+                bar = go.Bar(x = [name], y=[tmp[name]], name=name, 
+                             marker=dict(color=color))
+                traces.append(bar)
+            layout = copy(self.plot_theme)
+            layout['title'] = stuff
+            fig = go.Figure(traces, layout = layout)
+            pio.write_image(fig, directory + stuff + ".jpg", format="jpg", 
+                        height=1000, width=1000, scale=2)
+        if verbose:
+            print("Summary statistic plots ready.")
+
+
     
     ########################################################################
     # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~# 
@@ -518,6 +593,17 @@ class Whatsapp_Analytics():
     # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~# 
     # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~#
     ########################################################################
+    
+    def calc_number_messages_per_day(self):
+        num_mes_dict = {}
+        for i, table in enumerate(self.tables):
+            name = table['Written_by'].iloc[0]
+            copy = table.copy(deep=True)
+            copy['day'] = [stamp.date() for stamp in copy.Timestamp] 
+            sizes = pd.Series(copy.groupby('day').size())
+            num_mes_dict[name] = sizes
+        return num_mes_dict
+    
     
     def calc_message_sizes(self):
         worddict = {}
@@ -557,6 +643,10 @@ class Whatsapp_Analytics():
         return np.round(np.mean(x), decimals=3)
     
     
+    def maxround(self, x):
+        return np.round(np.max(x), decimals=3)
+    
+    
     def onlypospart(self, x):
         x = np.array(x)
         return x[x >= 0]
@@ -586,10 +676,20 @@ class Whatsapp_Analytics():
     def show_summary_statistics(self):
         message_sizes = self.calc_message_sizes()
         resptimes = self.calc_respond_time()
+        num_messages = self.calc_number_messages_per_day()
+
         summaries = list()
         for name, table in zip(self.names, self.tables):
             stats = {}
             stats['Number messages sent'] = table.shape[0]
+            total_number_words = message_sizes['Wordlengths'][name].sum()
+            total_number_chars = message_sizes['Charlengths'][name].sum()
+            stats['Number words sent'] = total_number_words
+            stats['Number characters sent'] = total_number_chars
+            av_messages = self.meanround(num_messages[name])
+            max_messages = self.maxround(num_messages[name])
+            stats['Average number of messages per day'] = av_messages
+            stats['Max number of messages sent in a day'] = max_messages
             av_wordlens = self.meanround(message_sizes['Wordlengths'][name])
             av_charlens = self.meanround(message_sizes['Charlengths'][name])
             stats['Average message size in words'] = av_wordlens
@@ -604,6 +704,7 @@ class Whatsapp_Analytics():
         
         restable = pd.concat(summaries, axis=1, sort=False)
         restable.columns = self.names
+        
         return restable
     
     

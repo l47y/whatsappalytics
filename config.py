@@ -16,8 +16,8 @@ def convert_rgb_to_plotlycolor(rgb_vec):
 grey_tone = 50
 background_col = convert_rgb_to_plotlycolor(np.repeat(grey_tone, 3))
 
-# Define a unified plot format which will be used by every plot
-layout_for_plots = go.Layout(
+# Define some unified plot layouts which will be used by every plot
+dark_theme = go.Layout(
     paper_bgcolor=background_col,
     plot_bgcolor=background_col,
     xaxis=dict(
@@ -46,8 +46,40 @@ layout_for_plots = go.Layout(
         size=20,
         color='white'),
     height=800,
- )          
-                
+ ) 
+
+light_theme = go.Layout(
+    paper_bgcolor='white',
+    plot_bgcolor='white',
+    xaxis=dict(
+        titlefont=dict(
+            size=18,
+            color='black'
+        ),
+        showticklabels=True,
+        tickfont=dict(
+            size=14,
+            color='black'),
+        automargin=True
+        ),
+    yaxis=dict(
+        titlefont=dict(
+            size=18,
+            color='black'
+        ),
+        automargin=True,
+        showticklabels=True,
+        tickfont=dict(
+            size=14,
+            color='black'
+        )),
+    font=dict(
+        size=20,
+        color='black'),
+    height=800,
+ )       
+     
+my_plot_themes = {'dark': dark_theme, 'light': light_theme}        
    
 # Some default strings which will be excluded later              
 strings_to_exclude = [
