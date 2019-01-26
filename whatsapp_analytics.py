@@ -349,18 +349,23 @@ class Whatsapp_Analytics():
         names = list()
         for table in self.tables:
             smilies = self.extract_emojis(table['Message'])
-            freqs.append(pd.Series(smilies).value_counts()[0:10])
+            freqs.append(pd.Series(smilies).value_counts())
             names.append(table['Written_by'].iloc[0])
             
         # the following is done to sort the emojis by sum of usage of all 
         # persons in the chat
         freqs = pd.concat(freqs, axis=1, sort=True).fillna(0)
-        vec = np.zeros(freqs.shape[0])
-        for i in range(freqs.shape[1]):
-            vec += freqs.iloc[:, i]
-            
-        ind = np.flip(np.argsort(vec))
-        freqs = freqs.iloc[ind.values, :]
+        freqs["sum"] = freqs.apply(sum, axis=1)
+        freqs.sort_values(by="sum", inplace=True, ascending=False)
+        freqs = freqs.iloc[1:15, :]
+        freqs.drop(["sum"], inplace=True, axis=1)
+#        return(freqs)
+#        vec = np.zeros(freqs.shape[0])
+#        for i in range(freqs.shape[1]):
+#            vec += freqs.iloc[:, i]
+#            
+#        ind = np.flip(np.argsort(vec))
+#        freqs = freqs.iloc[ind.values, :]
         traces = list()
         for i in range(freqs.shape[1]):
             bar = go.Bar(x=freqs.index, y=freqs.iloc[:, i], name=names[i],
@@ -584,8 +589,6 @@ class Whatsapp_Analytics():
         if verbose:
             print("Summary statistic plots ready.")
 
-
-    
     ########################################################################
     # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~# 
     # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~# 
@@ -707,4 +710,10 @@ class Whatsapp_Analytics():
         
         return restable
     
+    
+path = '/home/nicolas/Escritorio/PyProjects/whatsappalytics/data/PatrickNazli.txt'
+languages = ['german', 'english'] 
+wa = Whatsapp_Analytics(path, theme="dark", languages=languages,
+                            exclude=strings_to_exclude)
+x = wa.plot_most_used_emojis(nb_mode=True)
     
