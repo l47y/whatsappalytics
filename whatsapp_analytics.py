@@ -359,13 +359,6 @@ class Whatsapp_Analytics():
         freqs.sort_values(by="sum", inplace=True, ascending=False)
         freqs = freqs.iloc[1:15, :]
         freqs.drop(["sum"], inplace=True, axis=1)
-#        return(freqs)
-#        vec = np.zeros(freqs.shape[0])
-#        for i in range(freqs.shape[1]):
-#            vec += freqs.iloc[:, i]
-#            
-#        ind = np.flip(np.argsort(vec))
-#        freqs = freqs.iloc[ind.values, :]
         traces = list()
         for i in range(freqs.shape[1]):
             bar = go.Bar(x=freqs.index, y=freqs.iloc[:, i], name=names[i],
@@ -709,11 +702,4 @@ class Whatsapp_Analytics():
         restable.columns = self.names
         
         return restable
-    
-    
-path = '/home/nicolas/Escritorio/PyProjects/whatsappalytics/data/PatrickNazli.txt'
-languages = ['german', 'english'] 
-wa = Whatsapp_Analytics(path, theme="dark", languages=languages,
-                            exclude=strings_to_exclude)
-x = wa.plot_most_used_emojis(nb_mode=True)
     
