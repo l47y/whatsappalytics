@@ -4,10 +4,9 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
 from plotly.offline import plot
-from whatsapp_analytics import Whatsapp_Analytics
 from config import background_col
+from whatsapp_analytics import Whatsapp_Analytics
 import os
-
 
 # MAIN CONFIGURATION
 ##################################################################
