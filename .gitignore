@@ -10,6 +10,9 @@ GeschenkPatrick.py
 /light/*
 /dark/*
 __pycache__/*
+/src/test.py
+src/.ipynb_checkpoints/make_report-checkpoint.ipynb
+src/temp-plot.html
 
 
 
