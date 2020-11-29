@@ -119,6 +119,7 @@ class Whatsapp_Analytics():
                 # if yes, the loop skips this. 
                 if not bool(re.search('[A-Z, a-z]', messages[i][0])):
                     found_formats.append(extract_format(messages[i]))
+            found_formats = [el for el in found_formats if el is not None]
             if any([len(np.unique(found_formats)) > 1,
                     len(np.unique(found_formats)) < 1]):
                 raise ValueError('The provided chat format is not known yet.')
