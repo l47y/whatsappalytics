@@ -35,7 +35,7 @@ retrying==1.3.3
 six==1.12.0
 stop-words==2018.7.23
 traitlets==4.3.2
-urllib3==1.24.2
+urllib3==1.26.5
 Werkzeug==0.15.3
 wordcloud==1.5.0
 zope.interface==4.6.0
